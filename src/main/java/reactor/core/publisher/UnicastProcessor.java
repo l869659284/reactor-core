@@ -30,6 +30,7 @@ import reactor.core.Fuseable;
 import reactor.core.Producer;
 import reactor.core.Receiver;
 import reactor.util.concurrent.QueueSupplier;
+import reactor.util.context.Context;
 
 /**
  * A Processor implementation that takes a custom queue and allows
@@ -353,7 +354,7 @@ public final class UnicastProcessor<T>
 	}
 
 	@Override
-	public void subscribe(Subscriber<? super T> s) {
+	public void subscribe(Subscriber<? super T> s, Context ctx) {
 		if (s == null) {
 			throw Exceptions.argumentIsNullException();
 		}

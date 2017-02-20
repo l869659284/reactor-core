@@ -25,6 +25,7 @@ import reactor.core.Disposable;
 import reactor.core.Fuseable;
 import reactor.core.Scannable;
 import reactor.core.scheduler.Scheduler;
+import reactor.util.context.Context;
 
 
 /**
@@ -46,7 +47,7 @@ final class FluxSubscribeOnValue<T> extends Flux<T> implements Fuseable {
 	}
 
 	@Override
-	public void subscribe(Subscriber<? super T> s) {
+	public void subscribe(Subscriber<? super T> s, Context context) {
 		T v = value;
 		if (v == null) {
 			ScheduledEmpty parent = new ScheduledEmpty(s);

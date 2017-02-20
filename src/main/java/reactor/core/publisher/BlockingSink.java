@@ -303,7 +303,6 @@ public final class BlockingSink<E>
 		return !cancelled && requested != 0L;
 	}
 
-	@Override
 	public boolean isCancelled() {
 		return cancelled;
 	}
@@ -332,7 +331,6 @@ public final class BlockingSink<E>
 		}
 	}
 
-	@Override
 	public long requestedFromDownstream() {
 		return requested;
 	}

@@ -31,10 +31,12 @@ import reactor.core.Exceptions;
 import reactor.core.Fuseable;
 import reactor.core.Receiver;
 import reactor.core.Scannable;
+import reactor.core.scheduler.Schedulers;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.core.scheduler.TimedScheduler;
 import reactor.util.concurrent.QueueSupplier;
+import reactor.util.context.Context;
 
 /**
  * Replays all or the last N items to Subscribers.
@@ -390,7 +392,7 @@ public final class ReplayProcessor<T> extends FluxProcessor<T, T>
 	}
 
 	@Override
-	public void subscribe(Subscriber<? super T> s) {
+	public void subscribe(Subscriber<? super T> s, Context ctx) {
 		if (s == null) {
 			throw Exceptions.argumentIsNullException();
 		}

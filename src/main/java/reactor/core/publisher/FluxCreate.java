@@ -24,15 +24,18 @@ import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.LongConsumer;
 
 import org.reactivestreams.Subscriber;
 import reactor.core.Cancellation;
+import reactor.util.context.ContextRelay;
 import reactor.core.Disposable;
 import reactor.core.Exceptions;
 import reactor.core.Scannable;
 import reactor.core.publisher.FluxSink.OverflowStrategy;
 import reactor.util.concurrent.QueueSupplier;
+import reactor.util.context.Context;
 
 
 
@@ -64,28 +67,28 @@ final class FluxCreate<T> extends Flux<T> {
 	}
 
 	@Override
-	public void subscribe(Subscriber<? super T> t) {
+	public void subscribe(Subscriber<? super T> t, Context ctx) {
 		BaseSink<T> sink;
 
 		switch (backpressure) {
 			case IGNORE: {
-				sink = new IgnoreSink<>(t);
+				sink = new IgnoreSink<>(t, ctx);
 				break;
 			}
 			case ERROR: {
-				sink = new ErrorAsyncSink<>(t);
+				sink = new ErrorAsyncSink<>(t, ctx);
 				break;
 			}
 			case DROP: {
-				sink = new DropAsyncSink<>(t);
+				sink = new DropAsyncSink<>(t, ctx);
 				break;
 			}
 			case LATEST: {
-				sink = new LatestAsyncSink<>(t);
+				sink = new LatestAsyncSink<>(t, ctx);
 				break;
 			}
 			default: {
-				sink = new BufferAsyncSink<>(t, QueueSupplier.SMALL_BUFFER_SIZE);
+				sink = new BufferAsyncSink<>(t, QueueSupplier.SMALL_BUFFER_SIZE, ctx);
 				break;
 			}
 		}
@@ -127,6 +130,12 @@ final class FluxCreate<T> extends Flux<T> {
 		SerializedSink(BaseSink<T> sink) {
 			this.sink = sink;
 			this.queue = QueueSupplier.<T>unbounded(16).get();
+		}
+
+		@Override
+		public FluxSink<T> contextualize(Function<Context, Context> doOnContext) {
+			sink.contextualize(doOnContext);
+			return this;
 		}
 
 		@Override
@@ -297,9 +306,12 @@ final class FluxCreate<T> extends Flux<T> {
 	}
 
 	static abstract class BaseSink<T>
+			extends AtomicBoolean
 			implements FluxSink<T>, InnerProducer<T> {
 
 		final Subscriber<? super T> actual;
+
+		final Context context;
 
 		volatile Disposable disposable;
 		@SuppressWarnings("rawtypes")
@@ -318,9 +330,20 @@ final class FluxCreate<T> extends Flux<T> {
 		static final AtomicReferenceFieldUpdater<BaseSink, LongConsumer> REQUEST_CONSUMER =
 				AtomicReferenceFieldUpdater.newUpdater(BaseSink.class, LongConsumer.class, "requestConsumer");
 
-		BaseSink(Subscriber<? super T> actual) {
+		BaseSink(Subscriber<? super T> actual, Context ctx) {
 			this.actual = actual;
+			this.context = ctx;
+		}
 
+		@Override
+		public FluxSink<T> contextualize(Function<Context, Context> doOnContext) {
+			if (compareAndSet(false, true)) {
+				Context c = doOnContext.apply(context);
+				if(c != context) {
+					ContextRelay.set(actual, c);
+				}
+			}
+			return this;
 		}
 
 		@Override
@@ -486,8 +509,8 @@ final class FluxCreate<T> extends Flux<T> {
 
 	static final class IgnoreSink<T> extends BaseSink<T> {
 
-		IgnoreSink(Subscriber<? super T> actual) {
-			super(actual);
+		IgnoreSink(Subscriber<? super T> actual, Context ctx) {
+			super(actual, ctx);
 		}
 
 		@Override
@@ -512,8 +535,8 @@ final class FluxCreate<T> extends Flux<T> {
 
 	static abstract class NoOverflowBaseAsyncSink<T> extends BaseSink<T> {
 
-		NoOverflowBaseAsyncSink(Subscriber<? super T> actual) {
-			super(actual);
+		NoOverflowBaseAsyncSink(Subscriber<? super T> actual, Context ctx) {
+			super(actual, ctx);
 		}
 
 		@Override
@@ -538,8 +561,8 @@ final class FluxCreate<T> extends Flux<T> {
 
 	static final class DropAsyncSink<T> extends NoOverflowBaseAsyncSink<T> {
 
-		DropAsyncSink(Subscriber<? super T> actual) {
-			super(actual);
+		DropAsyncSink(Subscriber<? super T> actual, Context ctx) {
+			super(actual, ctx);
 		}
 
 		@Override
@@ -551,8 +574,8 @@ final class FluxCreate<T> extends Flux<T> {
 
 	static final class ErrorAsyncSink<T> extends NoOverflowBaseAsyncSink<T> {
 
-		ErrorAsyncSink(Subscriber<? super T> actual) {
-			super(actual);
+		ErrorAsyncSink(Subscriber<? super T> actual, Context ctx) {
+			super(actual, ctx);
 		}
 
 		@Override
@@ -574,8 +597,8 @@ final class FluxCreate<T> extends Flux<T> {
 		static final AtomicIntegerFieldUpdater<BufferAsyncSink> WIP =
 				AtomicIntegerFieldUpdater.newUpdater(BufferAsyncSink.class, "wip");
 
-		 BufferAsyncSink(Subscriber<? super T> actual, int capacityHint) {
-			super(actual);
+		 BufferAsyncSink(Subscriber<? super T> actual, int capacityHint, Context ctx) {
+			super(actual, ctx);
 			this.queue = QueueSupplier.<T>unbounded(capacityHint).get();
 		}
 
@@ -715,8 +738,8 @@ final class FluxCreate<T> extends Flux<T> {
 		static final AtomicIntegerFieldUpdater<LatestAsyncSink> WIP =
 				AtomicIntegerFieldUpdater.newUpdater(LatestAsyncSink.class, "wip");
 
-		LatestAsyncSink(Subscriber<? super T> actual) {
-			super(actual);
+		LatestAsyncSink(Subscriber<? super T> actual, Context ctx) {
+			super(actual, ctx);
 			this.queue = new AtomicReference<>();
 		}
 

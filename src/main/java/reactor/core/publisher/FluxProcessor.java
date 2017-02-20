@@ -29,6 +29,7 @@ import reactor.core.Exceptions;
 import reactor.core.MultiProducer;
 import reactor.core.Scannable;
 import reactor.core.Trackable;
+import reactor.util.context.Context;
 
 /**
  * A base processor that exposes {@link Flux} API for {@link Processor}.
@@ -151,7 +152,7 @@ public abstract class FluxProcessor<IN, OUT> extends Flux<OUT>
 	 * Note: From 3.1 this is to be left unimplemented
 	 */
 	@Override
-	public void subscribe(Subscriber<? super OUT> s) {
+	public void subscribe(Subscriber<? super OUT> s, Context ctx) {
 		if (s == null) {
 			throw Exceptions.argumentIsNullException();
 		}

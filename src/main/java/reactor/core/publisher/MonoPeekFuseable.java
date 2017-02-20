@@ -22,6 +22,7 @@ import java.util.function.LongConsumer;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.Fuseable;
+import reactor.util.context.Context;
 
 /**
  * Peeks out values that make a filter function return false.
@@ -30,7 +31,7 @@ import reactor.core.Fuseable;
  * @see <a href="https://github.com/reactor/reactive-streams-commons">Reactive-Streams-Commons</a>
  *
  */
-final class MonoPeekFuseable<T> extends MonoSource<T, T>
+final class MonoPeekFuseable<T> extends MonoOperator<T, T>
 		implements Fuseable, SignalPeek<T> {
 
 	final Consumer<? super Subscription> onSubscribeCall;
@@ -68,13 +69,13 @@ final class MonoPeekFuseable<T> extends MonoSource<T, T>
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public void subscribe(Subscriber<? super T> s) {
+	public void subscribe(Subscriber<? super T> s, Context ctx) {
 		if (s instanceof ConditionalSubscriber) {
 			source.subscribe(new FluxPeekFuseable.PeekFuseableConditionalSubscriber<>((ConditionalSubscriber<?
-					super T>) s, this));
+					super T>) s, this), ctx);
 			return;
 		}
-		source.subscribe(new FluxPeekFuseable.PeekFuseableSubscriber<>(s, this));
+		source.subscribe(new FluxPeekFuseable.PeekFuseableSubscriber<>(s, this), ctx);
 	}
 
 	@Override
